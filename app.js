@@ -70,6 +70,7 @@ const DEFAULTS = {
     owner: "",
     character: "Meraklı, samimi ve dürüst. Öğrenmeyi sever, bilmediğini açıkça söyler.",
     modelPreset: "balanced",
+    f32: true,               // uyumlu mod: bazı telefonlarda f16 bozuk çıktı verir
     facing: "environment",
     tts: false,
     teach: true,
@@ -241,7 +242,8 @@ async function resolveModelId() {
   let id = (MODEL_PRESETS[state.settings.modelPreset] || MODEL_PRESETS.balanced).id;
   try {
     const adapter = navigator.gpu && (await navigator.gpu.requestAdapter());
-    if (adapter && !adapter.features.has("shader-f16")) id = id.replace("q4f16_1", "q4f32_1");
+    const noF16 = adapter && !adapter.features.has("shader-f16");
+    if (state.settings.f32 || noF16) id = id.replace("q4f16_1", "q4f32_1");
   } catch (e) { /* varsayılan kalsın */ }
   return id;
 }
@@ -382,7 +384,9 @@ async function respond(userText, opts = {}) {
 }
 
 async function confirmFirstDownload() {
-  if (state.ready.llm || engine) return true;
+  const id = await resolveModelId();
+  if (engine && engineId === id) return true;
+  if (state.ready.llm === id) return true;
   return ask({
     title: "Beyin ilk kez indirilecek",
     text: "Yaklaşık 1-2 GB indirilir. Wi-Fi'da olduğundan emin ol. Bir kere indikten sonra internetsiz çalışır.",
@@ -758,6 +762,7 @@ function fillSettings() {
   $("setChar").value = s.character;
   $("setFacing").value = s.facing;
   $("setWatch").checked = s.watch;
+  $("setF32").checked = s.f32;
   $("setTts").checked = s.tts;
   const sel = $("setModel");
   sel.textContent = "";
@@ -904,7 +909,8 @@ function bind() {
     if (cam) { stopCam(); try { await startCam(); } catch (err) { toast("Kamera açılamadı: " + err.message); } }
     else setCamStatus();
   };
-  $("setWatch").onchange = (e) => { S.watch = e.target.checked; saveNow(); startWatch(); };
+  $("setF32").onchange = (e) => { S.f32 = e.target.checked; saveNow(); toast("Değişti. Bir sonraki mesajda uygun model yüklenir."); };
+    $("setWatch").onchange = (e) => { S.watch = e.target.checked; saveNow(); startWatch(); };
   $("setTts").onchange = (e) => { S.tts = e.target.checked; saveNow(); if (!S.tts && "speechSynthesis" in window) speechSynthesis.cancel(); };
   $("btnPrepare").onclick = prepareAll;
   $("btnExport").onclick = exportBackup;

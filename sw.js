@@ -1,6 +1,6 @@
 // Voks AI — çevrimdışı çalışma için servis çalışanı.
 // Uygulama dosyaları ve CDN kütüphaneleri önbelleğe alınır. Modeller kendi kütüphaneleri tarafından saklanır.
-const SHELL = "voksai-shell-v1";
+const SHELL = "voksai-shell-v2";
 const RUNTIME = "voksai-runtime-v1";
 const FILES = ["./", "./index.html", "./app.js", "./style.css", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
