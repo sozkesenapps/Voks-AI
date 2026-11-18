@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0f14">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Voks AI</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+  <header class="top">
+    <div class="brand"><span class="eye" id="eyeDot"></span><h1 id="aiTitle">Voks</h1></div>
+    <div class="chips">
+      <span class="chip" id="chipModel">Beyin: kapalı</span>
+      <span class="chip" id="chipCam">Göz: kapalı</span>
+    </div>
+  </header>
+
+  <div id="progress" class="progress" hidden>
+    <div class="bar"><div id="progressBar"></div></div>
+    <span id="progressText"></span>
+  </div>
+  <div id="banner" class="banner" hidden></div>
+
+  <main>
+    <!-- SOHBET -->
+    <section id="tab-chat" class="tab active">
+      <div id="camBox" class="cambox" hidden>
+        <video id="video" playsinline muted autoplay></video>
+        <div id="camTags" class="camtags"></div>
+      </div>
+      <div id="log" class="log" aria-live="polite"></div>
+      <div class="tools">
+        <button id="btnCam" class="tool" type="button">📷 Kamera</button>
+        <button id="btnLook" class="tool" type="button">👁 Bak</button>
+        <button id="btnEnroll" class="tool" type="button">👤 Tanıt</button>
+        <button id="btnThink" class="tool" type="button">💭 Düşün</button>
+        <button id="btnTeach" class="tool on" type="button">🎓 Öğretme: açık</button>
+      </div>
+      <form id="composer" class="composer" autocomplete="off">
+        <button id="btnMic" class="icon-btn" type="button" title="Konuşarak yaz (internet gerekir)" hidden>🎤</button>
+        <textarea id="input" rows="1" placeholder="Bir şey öğret ya da sor…" enterkeyhint="send"></textarea>
+        <button id="btnSend" class="send" type="submit">Gönder</button>
+      </form>
+    </section>
+
+    <!-- HAFIZA -->
+    <section id="tab-memory" class="tab">
+      <div class="scroll">
+        <h2>Öğrettiklerin <span class="count" id="countFacts">0</span></h2>
+        <form id="factForm" class="row">
+          <input id="factInput" type="text" placeholder="Yeni bir bilgi ekle…" maxlength="300">
+          <button class="small" type="submit">Ekle</button>
+        </form>
+        <ul id="listFacts" class="list"></ul>
+
+        <h2>Tanıdığı kişiler <span class="count" id="countPeople">0</span></h2>
+        <ul id="listPeople" class="list"></ul>
+
+        <h2>Düşünceleri <span class="count" id="countThoughts">0</span></h2>
+        <ul id="listThoughts" class="list"></ul>
+      </div>
+    </section>
+
+    <!-- AYARLAR -->
+    <section id="tab-settings" class="tab">
+      <div class="scroll">
+        <h2>Kimlik</h2>
+        <label>Yapay zekanın adı<input id="setName" type="text" maxlength="30"></label>
+        <label>Senin adın (ona nasıl hitap etsin)<input id="setOwner" type="text" maxlength="30" placeholder="Boş bırakabilirsin"></label>
+        <label>Karakteri<textarea id="setChar" rows="3" maxlength="300"></textarea></label>
+
+        <h2>Beyin</h2>
+        <label>Model
+          <select id="setModel"></select>
+        </label>
+        <p class="hint">Daha büyük model daha akıllı ama daha yavaş ve daha çok yer kaplar. Modeli değiştirirsen ilk kullanımda yeniden iner.</p>
+
+        <h2>Kamera ve ses</h2>
+        <label>Kamera yönü
+          <select id="setFacing"><option value="environment">Arka kamera</option><option value="user">Ön kamera</option></select>
+        </label>
+        <label class="check"><input id="setWatch" type="checkbox"> Kamera açıkken sürekli yüz tanı (pil harcar)</label>
+        <label class="check"><input id="setTts" type="checkbox"> Cevapları sesli oku</label>
+
+        <h2>İnternetsiz çalışma</h2>
+        <ul id="readyList" class="list ready"></ul>
+        <button id="btnPrepare" class="wide" type="button">Hepsini hazırla (Wi-Fi önerilir)</button>
+        <p class="hint">Bu düğme gereken her şeyi bir kere indirir. Sonrasında uçak modunda da çalışır. Mikrofon (🎤) hariç: Chrome sesi tanımak için internet kullanır.</p>
+
+        <h2>Yedek</h2>
+        <div class="row">
+          <button id="btnExport" class="small" type="button">Hafızayı yedekle</button>
+          <label class="small filebtn">Yedekten yükle<input id="fileImport" type="file" accept="application/json,.json" hidden></label>
+        </div>
+        <p class="hint">Tarayıcı verisini silersen hafıza da gider. Zaman zaman yedek al.</p>
+        <button id="btnReset" class="wide danger" type="button">Her şeyi sıfırla</button>
+        <p class="hint small-print">Bu sayfa verilerini yalnızca bu telefonda tutar. Hiçbir sunucuya gönderilmez.</p>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabs">
+    <button class="tabbtn active" data-tab="chat" type="button">Sohbet</button>
+    <button class="tabbtn" data-tab="memory" type="button">Hafıza</button>
+    <button class="tabbtn" data-tab="settings" type="button">Ayarlar</button>
+  </nav>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<div id="modal" class="modal" hidden>
+  <div class="card">
+    <h3 id="modalTitle"></h3>
+    <p id="modalText"></p>
+    <input id="modalInput" type="text" maxlength="60" hidden>
+    <div class="row end">
+      <button id="modalCancel" class="small ghost" type="button">Vazgeç</button>
+      <button id="modalOk" class="small" type="button">Tamam</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="app.js"></script>
+</body>
+</html>
