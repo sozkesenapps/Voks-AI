@@ -69,7 +69,8 @@ const DEFAULTS = {
     aiName: "Voks",
     owner: "",
     character: "Meraklı, samimi ve dürüst. Öğrenmeyi sever, bilmediğini açıkça söyler.",
-    modelPreset: "balanced",
+    v: 2,
+    modelPreset: "light",
     f32: true,               // uyumlu mod: bazı telefonlarda f16 bozuk çıktı verir
     facing: "environment",
     tts: false,
@@ -90,8 +91,11 @@ function loadState() {
     if (!raw) return base;
     const o = JSON.parse(raw);
     base.settings = { ...base.settings, ...(o.settings || {}) };
+    if (!o.settings || o.settings.v !== 2) { base.settings.v = 2; base.settings.modelPreset = "light"; base.settings.f32 = true; }
     for (const k of ["facts", "people", "thoughts", "chat"]) if (Array.isArray(o[k])) base[k] = o[k];
+    const keepLlm = !o.settings || o.settings.v === 2;
     base.ready = { ...base.ready, ...(o.ready || {}) };
+    if (!keepLlm) base.ready.llm = null;
   } catch (e) { console.warn("Hafıza okunamadı", e); }
   return base;
 }
@@ -238,14 +242,28 @@ function setBusyUI(on) {
 // ---------------------------------------------------------------- beyin (WebLLM)
 let engine = null, engineId = null, webllmMod = null, llmLoading = null;
 
+let diagText = "";
+function showDiag() { const d = $("diag"); if (d) d.textContent = diagText; }
+
 async function resolveModelId() {
-  let id = (MODEL_PRESETS[state.settings.modelPreset] || MODEL_PRESETS.balanced).id;
+  let id = (MODEL_PRESETS[state.settings.modelPreset] || MODEL_PRESETS.light).id;
   try {
     const adapter = navigator.gpu && (await navigator.gpu.requestAdapter());
     const noF16 = adapter && !adapter.features.has("shader-f16");
+    if (adapter) {
+      const inf = adapter.info || {};
+      diagText = `GPU: ${[inf.vendor, inf.architecture, inf.description].filter(Boolean).join(" ") || "bilinmiyor"} | f16: ${noF16 ? "yok" : "var"}`;
+      showDiag();
+    }
     if (state.settings.f32 || noF16) id = id.replace("q4f16_1", "q4f32_1");
   } catch (e) { /* varsayılan kalsın */ }
   return id;
+}
+
+async function resetEngine() {
+  if (engine) { try { await engine.unload(); } catch (e) { /* yok say */ } }
+  engine = null; engineId = null;
+  updateChips();
 }
 
 async function ensureLLM() {
@@ -325,17 +343,29 @@ function buildSystem(query, opts = {}) {
   return L.join("\n\n");
 }
 
-async function generate(messages, onToken) {
-  const eng = await ensureLLM();
-  const stream = await eng.chat.completions.create({ messages, stream: true, temperature: 0.7, top_p: 0.9, max_tokens: 320 });
-  let out = "";
-  for await (const chunk of stream) {
-    const d = chunk.choices?.[0]?.delta?.content || "";
-    if (!d) continue;
-    out += d;
-    if (onToken) onToken(out);
+const GPU_BROKEN = /dispos|mapAsync|device|lost|instance reference|destroyed/i;
+async function generate(messages, onToken, retried = false) {
+  try {
+    const eng = await ensureLLM();
+    const stream = await eng.chat.completions.create({ messages, stream: true, temperature: 0.7, top_p: 0.9, max_tokens: 320 });
+    let out = "";
+    for await (const chunk of stream) {
+      const d = chunk.choices?.[0]?.delta?.content || "";
+      if (!d) continue;
+      out += d;
+      if (onToken) onToken(out);
+    }
+    return out.trim();
+  } catch (e) {
+    // GPU bağlantısı koptuysa beyni baştan kurup bir kez daha dene
+    if (!retried && GPU_BROKEN.test(String(e && e.message))) {
+      console.warn("GPU sorunu, beyin yeniden başlatılıyor", e);
+      await resetEngine();
+      return generate(messages, onToken, true);
+    }
+    if (GPU_BROKEN.test(String(e && e.message))) await resetEngine();
+    throw e;
   }
-  return out.trim();
 }
 
 function speak(text) {
@@ -913,6 +943,7 @@ function bind() {
     $("setWatch").onchange = (e) => { S.watch = e.target.checked; saveNow(); startWatch(); };
   $("setTts").onchange = (e) => { S.tts = e.target.checked; saveNow(); if (!S.tts && "speechSynthesis" in window) speechSynthesis.cancel(); };
   $("btnPrepare").onclick = prepareAll;
+  $("btnRestartBrain").onclick = async () => { await resetEngine(); toast("Beyin sıfırlandı. Bir sonraki mesajda yeniden yüklenir."); };
   $("btnExport").onclick = exportBackup;
   $("fileImport").onchange = (e) => { const f = e.target.files[0]; e.target.value = ""; if (f) importBackup(f); };
   $("btnReset").onclick = resetAll;
@@ -927,6 +958,7 @@ function init() {
   renderLog();
   renderMemory();
   setupMic();
+  if (navigator.gpu) resolveModelId().catch(() => {});
   if (!navigator.gpu) setBanner("Bu tarayıcıda WebGPU yok, beyin çalışamaz. Android'de güncel Chrome ile aç.");
   else if (location.protocol === "http:" && location.hostname !== "localhost") setBanner("Kamera için sayfa https ile açılmalı.");
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
